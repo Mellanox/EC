@@ -1,2 +1,6 @@
 build
 .*
+
+# tests outputs
+/tests/*.o
+/tests/ibv_ec_*
