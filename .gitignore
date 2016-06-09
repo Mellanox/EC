@@ -1,5 +1,7 @@
-build
 .*
+
+# build dir
+build
 
 # tests outputs
 /tests/*.o

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project>
+
+    <target name="clean">
+        <delete dir="build"/>
+    </target>
+
+    <path id="classpath">
+        <fileset dir="./hadoop-jars" includes="**/*.jar"/>
+    </path>
+
+    <target name="build">
+        <mkdir dir="build/classes"/>
+        <javac srcdir="src" destdir="build/classes" classpathref="classpath" includeantruntime="false"/>
+	<mkdir dir="build/c"/>
+	<javah classpath="src/java" destdir="build/c">
+              <class name="com.mellanox.erasurecode.rawcoder.MellanoxRSRawEncoder"/>
+              <class name="com.mellanox.erasurecode.rawcoder.MellanoxRSRawDecoder"/>
+        </javah>
+	<exec executable="/bin/sh">
+		<arg value="-c" />
+                <arg value="cp src/native/com/mellanox/erasurecode/*.c src/native/com/mellanox/erasurecode/*.h build/c"/>
+        </exec>
+	<echo message="creating libHdfsEcOffload.so"/>
+        <mkdir dir="build/lib"/>
+	<exec executable="/bin/sh" failonerror="true">
+                <arg value="-c" />
+                <arg value="gcc -g -ggdb -Wall -W -D_GNU_SOURCE -shared -fpic -I /usr/include/jerasure -o build/lib/libHdfsEcOffload.so -libverbs -lgf_complete -lJerasure -lrdmacm -lecOffload
+				-I $JAVA_HOME/include -I $JAVA_HOME/include/linux build/c/Mellanox*.c -fPIC build/c/ec_*.c "/>
+        </exec>
+        <exec executable="/bin/sh">
+                <arg value="-c" />
+                <arg value="rm -rf build/c"/>
+        </exec>
+	<exec outputproperty="gitver" executable="git">
+                     <arg value="describe"/>
+                     <arg value="--long"/>
+                     <arg value="--tags"/>
+                     <arg value="--always"/>
+                     <arg value="--dirty"/>
+        </exec>
+
+        <mkdir dir="build/jar"/>
+        <jar destfile="build/jar/MellanoxECOffload.jar">
+	    <fileset dir="build/classes"/>
+	    <fileset dir="build/lib"/>
+            <manifest>
+                <attribute name="Implementation-Version" value="${gitver}"/>
+                <attribute name="Implementation-Vendor" value="Mellanox Technologies"/>
+            </manifest>
+        </jar>
+    </target>
+
+</project>
+
