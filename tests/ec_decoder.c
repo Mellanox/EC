@@ -182,12 +182,12 @@ init_ctx(struct ibv_device *ib_dev,
 
 	return ctx;
 
+free_ec:
+        free_ec_ctx(ctx->ec_ctx);
 dealloc_pd:
 	ibv_dealloc_pd(ctx->pd);
 close_device:
 	ibv_close_device(ctx->context);
-free_ec:
-	free_ec_ctx(ctx->ec_ctx);
 free_ctx:
 	free(ctx);
 

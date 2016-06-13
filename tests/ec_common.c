@@ -339,14 +339,14 @@ struct ec_context *alloc_ec_ctx(struct ibv_pd *pd, int frame_size,
 	ctx->context = pd->context;
 
 	memset(&dattr, 0, sizeof(dattr));
-	dattr.comp_mask = IBV_EXP_DEVICE_ATTR_EC_CAPS;
+	dattr.comp_mask = IBV_EXP_DEVICE_ATTR_EXP_CAP_FLAGS | IBV_EXP_DEVICE_ATTR_EC_CAPS;
 	err = ibv_exp_query_device(ctx->context, &dattr);
 	if (err) {
 		err_log("Couldn't query device for EC offload caps.\n");
 		goto free_ctx;
 	}
 
-	if (dattr.exp_device_cap_flags & IBV_EXP_DEVICE_EC_OFFLOAD) {
+	if (!(dattr.exp_device_cap_flags & IBV_EXP_DEVICE_EC_OFFLOAD)) {
 		err_log("EC offload not supported by driver.\n");
 		goto free_ctx;
 	}
