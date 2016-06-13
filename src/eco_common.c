@@ -322,13 +322,13 @@ struct eco_context *mlx_eco_init(int k, int m, int use_vandermonde_matrix)
 
 	// query device for EC offload capabilities.
 	memset(&dattr, 0, sizeof(dattr));
-	dattr.comp_mask = IBV_EXP_DEVICE_ATTR_EC_CAPS;
+	dattr.comp_mask = IBV_EXP_DEVICE_ATTR_EXP_CAP_FLAGS | IBV_EXP_DEVICE_ATTR_EC_CAPS;
 	if (ibv_exp_query_device(ibv_context, &dattr)) {
 		err_log("mlx_eco_init: Couldn't query device for EC offload caps.\n");
 		goto query_device_error;
 	}
 
-	if (dattr.exp_device_cap_flags & IBV_EXP_DEVICE_EC_OFFLOAD) {
+	if (!(dattr.exp_device_cap_flags & IBV_EXP_DEVICE_EC_OFFLOAD)) {
 		err_log("mlx_eco_init: EC offload not supported by driver.\n");
 		goto query_device_error;
 	}
