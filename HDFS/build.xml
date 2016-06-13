@@ -10,6 +10,14 @@
     </path>
 
     <target name="build">
+
+        <property name="HADOOP_HOME" value="world"/>
+        <echo message="Setting Hadoop home dir to : ${HADOOP_HOME}"/>
+
+        <path id="classpath">
+              <fileset dir="${HADOOP_HOME}/share/hadoop/common" includes="**/*.jar"/>
+        </path>
+
         <mkdir dir="build/classes"/>
         <javac srcdir="src" destdir="build/classes" classpathref="classpath" includeantruntime="false"/>
 	<mkdir dir="build/c"/>
