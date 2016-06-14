@@ -74,7 +74,7 @@ _Decode_
     16/06/14 16:07:24 INFO rawcoder.MellanoxECLibraryLoader: Using Mellanox Erasure Coding Offload plugin
     Performing decode with the following parameters :
     coderIndex = 3, numData = 6, numCode = 3, chunkSizeB = 64, inputFile = file_to_encode.txt , encodedFile = file_to_encode.txt.3.encode.code, erasures = 1,0,0,1,0,0,0,1
-Test Complete
+    Test Complete
 
 The test will allocate  _numData_ buffers used for the data, _numCode_ used for the encoded data (chunkSizeB bytes each) and decoder specified by the user.   
 Then, it will read  _numData_ * _chunkSizeB_ bytes from  _inputFile_ and  _numCode_ * _chunkSizeB_ bytes from  _encodedFile_.
