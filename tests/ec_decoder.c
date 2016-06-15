@@ -39,16 +39,16 @@ struct decoder_context {
 	struct ec_context	*ec_ctx;
 	int			datafd;
 	int			codefd;
-	int			outfd;
-	int			outfd_code_lib;
-	int                     outfd_data_lib;
+	int			outfd_data_verbs;
+	int			outfd_code_eco;
+	int			outfd_data_eco;
 };
 
 static void close_io_files(struct decoder_context *ctx)
 {
-	close(ctx->outfd);
-	close(ctx->outfd_code_lib);
-	close(ctx->outfd_data_lib);
+	close(ctx->outfd_data_verbs);
+	close(ctx->outfd_code_eco);
+	close(ctx->outfd_data_eco);
 	close(ctx->codefd);
 	close(ctx->datafd);
 }
@@ -71,7 +71,7 @@ static int open_io_files(struct inargs *in, struct decoder_context *ctx)
 		goto err_datafd;
 	}
 
-	outfile = calloc(1, strlen(in->datafile) + strlen(".decode") + 1);
+	outfile = calloc(1, strlen(in->datafile) + strlen(".decode.data.verbs") + 1);
 	if (!outfile) {
 		err_log("Failed to alloc outfile\n");
 		err = -ENOMEM;
@@ -79,17 +79,17 @@ static int open_io_files(struct inargs *in, struct decoder_context *ctx)
 	}
 
 	outfile = strcat(outfile, in->datafile);
-	outfile = strcat(outfile, ".decode");
+	outfile = strcat(outfile, ".decode.data.verbs");
 	unlink(outfile);
-	ctx->outfd = open(outfile, O_RDWR | O_CREAT, 0666);
-	if (ctx->outfd < 0) {
+	ctx->outfd_data_verbs = open(outfile, O_RDWR | O_CREAT, 0666);
+	if (ctx->outfd_data_verbs < 0) {
 		err_log("Failed to open offload file");
 		free(outfile);
 		err = -EIO;
 		goto err_codefd;
 	}
- // datalib
-	outfile_data_lib = calloc(1, strlen(in->datafile) + strlen(".decode.data.lib") + 1);
+	// datalib
+	outfile_data_lib = calloc(1, strlen(in->datafile) + strlen(".decode.data.eco") + 1);
 	if (!outfile_data_lib) {
 		err_log("Failed to alloc data outfile\n");
 		err = -ENOMEM;
@@ -97,10 +97,10 @@ static int open_io_files(struct inargs *in, struct decoder_context *ctx)
 	}
 
 	outfile_data_lib = strcat(outfile_data_lib, in->datafile);
-	outfile_data_lib = strcat(outfile_data_lib, ".decode.data.lib");
+	outfile_data_lib = strcat(outfile_data_lib, ".decode.data.eco");
 	unlink(outfile_data_lib);
-	ctx->outfd_data_lib = open(outfile_data_lib, O_RDWR | O_CREAT, 0666);
-	if (ctx->outfd_data_lib < 0) {
+	ctx->outfd_data_eco = open(outfile_data_lib, O_RDWR | O_CREAT, 0666);
+	if (ctx->outfd_data_eco < 0) {
 		err_log("Failed to open data offload library file");
 		free(outfile_data_lib);
 		err = -EIO;
@@ -108,33 +108,33 @@ static int open_io_files(struct inargs *in, struct decoder_context *ctx)
 	}
 	free(outfile_data_lib);
 
-// code lib
-        outfile_code_lib = calloc(1, strlen(in->datafile) + strlen(".decode.code.lib") + 1);
-        if (!outfile_code_lib) {
-                err_log("Failed to alloc code outfile\n");
-                err = -ENOMEM;
-                goto err_outfd;
-        }
+	// code lib
+	outfile_code_lib = calloc(1, strlen(in->datafile) + strlen(".decode.code.eco") + 1);
+	if (!outfile_code_lib) {
+		err_log("Failed to alloc code outfile\n");
+		err = -ENOMEM;
+		goto err_outfd;
+	}
 
-        outfile_code_lib = strcat(outfile_code_lib, in->datafile);
-        outfile_code_lib = strcat(outfile_code_lib, ".decode.code.lib");
-        unlink(outfile_code_lib);
-        ctx->outfd_code_lib = open(outfile_code_lib, O_RDWR | O_CREAT, 0666);
-        if (ctx->outfd_code_lib < 0) {
-                err_log("Failed to open code offload library file");
-                free(outfile_code_lib);
-                err = -EIO;
-                goto err_outfd;
-        }
-        free(outfile_code_lib);
+	outfile_code_lib = strcat(outfile_code_lib, in->datafile);
+	outfile_code_lib = strcat(outfile_code_lib, ".decode.code.eco");
+	unlink(outfile_code_lib);
+	ctx->outfd_code_eco = open(outfile_code_lib, O_RDWR | O_CREAT, 0666);
+	if (ctx->outfd_code_eco < 0) {
+		err_log("Failed to open code offload library file");
+		free(outfile_code_lib);
+		err = -EIO;
+		goto err_outfd;
+	}
+	free(outfile_code_lib);
 
-// done
+	// done
 	free(outfile);
 
 	return 0;
 
 err_outfd:
-	close(ctx->outfd);
+	close(ctx->outfd_data_verbs);
 err_codefd:
 	close(ctx->codefd);
 err_datafd:
@@ -145,7 +145,7 @@ err_datafd:
 
 static struct decoder_context *
 init_ctx(struct ibv_device *ib_dev,
-	 struct inargs *in)
+		struct inargs *in)
 {
 	struct decoder_context *ctx;
 	int err;
@@ -159,7 +159,7 @@ init_ctx(struct ibv_device *ib_dev,
 	ctx->context = ibv_open_device(ib_dev);
 	if (!ctx->context) {
 		fprintf(stderr, "Couldn't get context for %s\n",
-			ibv_get_device_name(ib_dev));
+				ibv_get_device_name(ib_dev));
 		goto free_ctx;
 	}
 
@@ -170,7 +170,7 @@ init_ctx(struct ibv_device *ib_dev,
 	}
 
 	ctx->ec_ctx = alloc_ec_ctx(ctx->pd, in->frame_size,
-				   in->k, in->m, in->w, 1, in->failed_blocks);
+			in->k, in->m, in->w, 1, in->failed_blocks);
 	if (!ctx->ec_ctx) {
 		fprintf(stderr, "Failed to allocate EC context\n");
 		goto dealloc_pd;
@@ -219,7 +219,7 @@ static void usage(const char *argv0)
 	printf("  -w, --gf=<gf>              Galois field GF(2^w)\n");
 	printf("  -D, --datafile=<name>      Name of input data file\n");
 	printf("  -C, --codefile=<name>      Name of input code file\n");
-	printf("  -E, --erasures=<erasures>  Comma saparated failed blocks\n");
+	printf("  -E, --erasures=<erasures>  Comma separated failed blocks\n");
 	printf("  -s, --frame_size=<size>    size of EC frame\n");
 	printf("  -d, --debug                print debug messages\n");
 	printf("  -v, --verbose              add verbosity\n");
@@ -230,22 +230,22 @@ static int process_inargs(int argc, char *argv[], struct inargs *in)
 {
 	int err;
 	struct option long_options[] = {
-		{ .name = "ib-dev",        .has_arg = 1, .val = 'i' },
-		{ .name = "datafile",      .has_arg = 1, .val = 'D' },
-		{ .name = "codefile",      .has_arg = 1, .val = 'C' },
-		{ .name = "erasures",      .has_arg = 1, .val = 'E' },
-		{ .name = "frame_size",    .has_arg = 1, .val = 's' },
-		{ .name = "data_blocks",   .has_arg = 1, .val = 'k' },
-		{ .name = "code_blocks",   .has_arg = 1, .val = 'm' },
-		{ .name = "gf",            .has_arg = 1, .val = 'w' },
-		{ .name = "debug",         .has_arg = 0, .val = 'd' },
-		{ .name = "verbose",       .has_arg = 0, .val = 'v' },
-		{ .name = "help",          .has_arg = 0, .val = 'h' },
-		{ .name = 0, .has_arg = 0, .val = 0 }
+			{ .name = "ib-dev",        .has_arg = 1, .val = 'i' },
+			{ .name = "datafile",      .has_arg = 1, .val = 'D' },
+			{ .name = "codefile",      .has_arg = 1, .val = 'C' },
+			{ .name = "erasures",      .has_arg = 1, .val = 'E' },
+			{ .name = "frame_size",    .has_arg = 1, .val = 's' },
+			{ .name = "data_blocks",   .has_arg = 1, .val = 'k' },
+			{ .name = "code_blocks",   .has_arg = 1, .val = 'm' },
+			{ .name = "gf",            .has_arg = 1, .val = 'w' },
+			{ .name = "debug",         .has_arg = 0, .val = 'd' },
+			{ .name = "verbose",       .has_arg = 0, .val = 'v' },
+			{ .name = "help",          .has_arg = 0, .val = 'h' },
+			{ .name = 0, .has_arg = 0, .val = 0 }
 	};
 
 	err = common_process_inargs(argc, argv, "i:D:C:E:s:k:m:w:hdv",
-				    long_options, in, usage);
+			long_options, in, usage);
 	if (err)
 		return err;
 
@@ -289,25 +289,25 @@ static int decode_file(struct decoder_context *ctx, struct eco_decoder *lib_deco
 
 	while (1) {
 		dbytes = read(ctx->datafd, ec_ctx->data.buf,
-			      ec_ctx->block_size * ec_ctx->attr.k);
+				ec_ctx->block_size * ec_ctx->attr.k);
 		if (dbytes <= 0)
 			break;
 
 
 		cbytes = read(ctx->codefd, ec_ctx->code.buf,
-			      ec_ctx->block_size * ec_ctx->attr.m);
+				ec_ctx->block_size * ec_ctx->attr.m);
 		if (cbytes <= 0)
 			break;
 
 		zero_erasures(ec_ctx, ec_ctx->data.buf, ec_ctx->code.buf);
 		err = ibv_exp_ec_decode_sync(ec_ctx->calc, &ec_ctx->mem,
-					 ec_ctx->u8_erasures, ec_ctx->de_mat);
+				ec_ctx->u8_erasures, ec_ctx->de_mat);
 		if (err) {
 			fprintf(stderr, "Failed ibv_exp_ec_decode (%d)\n", err);
 			return err;
 		}
 
-		wbytes = write(ctx->outfd, ec_ctx->data.buf, dbytes);
+		wbytes = write(ctx->outfd_data_verbs, ec_ctx->data.buf, dbytes);
 		if (wbytes < dbytes) {
 			fprintf(stderr, "Failed write to fd (%d)\n", err);
 			return err;
@@ -317,13 +317,13 @@ static int decode_file(struct decoder_context *ctx, struct eco_decoder *lib_deco
 		zero_erasures(ec_ctx, ec_ctx->data.buf, ec_ctx->code.buf);
 		err = mlx_eco_decoder_decode(lib_decoder, ec_ctx->data_arr, ec_ctx->code_arr, ec_ctx->attr.k, ec_ctx->attr.m, ec_ctx->block_size, erasures_arr, num_erasures);
 
-                wbytes = write(ctx->outfd_data_lib, ec_ctx->data.buf, dbytes);
-                if (wbytes < dbytes) {
-                        fprintf(stderr, "Library : Failed write to fd (%d)\n", err);
-                        return err;
-                }
+		wbytes = write(ctx->outfd_data_eco, ec_ctx->data.buf, dbytes);
+		if (wbytes < dbytes) {
+			fprintf(stderr, "Library : Failed write to fd (%d)\n", err);
+			return err;
+		}
 
-		wbytes = write(ctx->outfd_code_lib, ec_ctx->code.buf, cbytes);
+		wbytes = write(ctx->outfd_code_eco, ec_ctx->code.buf, cbytes);
 		if (wbytes < cbytes) {
 			fprintf(stderr, "Library : Failed write to fd (%d)\n", err);
 			return err;
@@ -339,18 +339,18 @@ static int decode_file(struct decoder_context *ctx, struct eco_decoder *lib_deco
 
 static void set_buffers(struct decoder_context *ctx)
 {
-        struct ec_context *ec_ctx = ctx->ec_ctx;
-        int i;
+	struct ec_context *ec_ctx = ctx->ec_ctx;
+	int i;
 
-        ec_ctx->data_arr = calloc(ec_ctx->attr.k, sizeof(*ec_ctx->data_arr));
-        ec_ctx->code_arr = calloc(ec_ctx->attr.m, sizeof(*ec_ctx->code_arr));
+	ec_ctx->data_arr = calloc(ec_ctx->attr.k, sizeof(*ec_ctx->data_arr));
+	ec_ctx->code_arr = calloc(ec_ctx->attr.m, sizeof(*ec_ctx->code_arr));
 
-        for (i = 0; i < ec_ctx->attr.k ; i++) {
-                ec_ctx->data_arr[i] = ec_ctx->data.buf + i * ec_ctx->block_size;
-        }
-        for (i = 0; i < ec_ctx->attr.m ; i++) {
-                ec_ctx->code_arr[i] = ec_ctx->code.buf + i * ec_ctx->block_size;
-        }
+	for (i = 0; i < ec_ctx->attr.k ; i++) {
+		ec_ctx->data_arr[i] = ec_ctx->data.buf + i * ec_ctx->block_size;
+	}
+	for (i = 0; i < ec_ctx->attr.m ; i++) {
+		ec_ctx->code_arr[i] = ec_ctx->code.buf + i * ec_ctx->block_size;
+	}
 }
 
 int main(int argc, char *argv[])
@@ -374,54 +374,48 @@ int main(int argc, char *argv[])
 
 	set_buffers(ctx);
 
-    // library init
-    struct eco_decoder *lib_decoder = mlx_eco_decoder_init(in.k, in.m, 1);
-    if (!lib_decoder) {
-        err_log("mlx_eco_decoder_init failed\n");
-        return -ENOMEM;
-    }
+	// library init
+	struct eco_decoder *lib_decoder = mlx_eco_decoder_init(in.k, in.m, 1);
+	if (!lib_decoder) {
+		err_log("mlx_eco_decoder_init failed\n");
+		return -ENOMEM;
+	}
 
 
-    int i;
-    int num_erasures = 0;
-    int erasures_arr[in.k + in.m];
+	int i;
+	int num_erasures = 0;
+	int erasures_arr[in.k + in.m];
 
-    for (i = 0 ; i < in.k + in.m ; i++) {
-        if (ctx->ec_ctx->int_erasures[i]) {
-            erasures_arr[num_erasures] = i;
-            num_erasures++;
-        }
-    }
+	for (i = 0 ; i < in.k + in.m ; i++) {
+		if (ctx->ec_ctx->int_erasures[i]) {
+			erasures_arr[num_erasures] = i;
+			num_erasures++;
+		}
+	}
 
-    printf("NUM ERASURES = %d : [", num_erasures);
-    for (i = 0 ; i < num_erasures ; i ++) {
-        printf(" %d", erasures_arr[i]);
-    }
-    printf(" ]\n");
+	err = mlx_eco_decoder_generate_decode_matrix(lib_decoder, erasures_arr, num_erasures);
+	if (err){
+		err_log("mlx_ec_allocate_decode_matrix failed\n");
+		return -ENOMEM;
+	}
 
-    err = mlx_eco_decoder_generate_decode_matrix(lib_decoder, erasures_arr, num_erasures);
-    if (err){
-        err_log("mlx_ec_allocate_decode_matrix failed\n");
-        return -ENOMEM;
-    }
+	// register buffers
+	err = mlx_eco_decoder_register(lib_decoder, ctx->ec_ctx->data_arr, ctx->ec_ctx->code_arr, in.k, in.m, ctx->ec_ctx->block_size);
+	if (err) {
+		err_log("mlx_ec_register_mrs failed to register\n");
+		return -ENOMEM;
+	}
 
-    // register buffers
-    err = mlx_eco_decoder_register(lib_decoder, ctx->ec_ctx->data_arr, ctx->ec_ctx->code_arr, in.k, in.m, ctx->ec_ctx->block_size);
-    if (err) {
-        err_log("mlx_ec_register_mrs failed to register\n");
-        return -ENOMEM;
-    }
+	err = decode_file(ctx, lib_decoder, erasures_arr, num_erasures);
+	if (err)
+		fprintf(stderr, "failed to encode file %s\n", in.datafile);
 
-    err = decode_file(ctx, lib_decoder, erasures_arr, num_erasures);
-    if (err)
-        fprintf(stderr, "failed to encode file %s\n", in.datafile);
-
-    // destroy
-    err = mlx_eco_decoder_release(lib_decoder);
-    if (err) {
-        err_log("mlx_ec_register_mrs failed to destroy\n");
-        return -ENOMEM;
-    }
+	// destroy
+	err = mlx_eco_decoder_release(lib_decoder);
+	if (err) {
+		err_log("mlx_ec_register_mrs failed to destroy\n");
+		return -ENOMEM;
+	}
 
 	close_ctx(ctx);
 

@@ -39,15 +39,15 @@ struct encoder_context {
 	struct ec_context	*ec_ctx;
 	int			infd;
 	int			outfd_sw;
-	int			outfd_off;
-	int			outfd_lib;
+	int			outfd_verbs;
+	int			outfd_eco;
 };
 
 static void close_io_files(struct encoder_context *ctx)
 {
 	close(ctx->outfd_sw);
-	close(ctx->outfd_off);
-	close(ctx->outfd_lib);
+	close(ctx->outfd_verbs);
+	close(ctx->outfd_eco);
 	close(ctx->infd);
 }
 
@@ -62,7 +62,7 @@ static int open_io_files(struct inargs *in, struct encoder_context *ctx)
 		return -EIO;
 	}
 
-	outfile = calloc(1, strlen(in->datafile) + strlen(".code.offload") + 1);
+	outfile = calloc(1, strlen(in->datafile) + strlen(".encode.code.verbs") + 1);
 	if (!outfile) {
 		err_log("Failed to alloc outfile\n");
 		err = -ENOMEM;
@@ -70,18 +70,18 @@ static int open_io_files(struct inargs *in, struct encoder_context *ctx)
 	}
 
 	outfile = strcat(outfile, in->datafile);
-	outfile = strcat(outfile, ".code.offload");
+	outfile = strcat(outfile, ".encode.code.verbs");
 	unlink(outfile);
-	ctx->outfd_off = open(outfile, O_RDWR | O_CREAT, 0666);
-	if (ctx->outfd_off < 0) {
-		err_log("Failed to open offload code file");
+	ctx->outfd_verbs = open(outfile, O_RDWR | O_CREAT, 0666);
+	if (ctx->outfd_verbs < 0) {
+		err_log("Failed to open verbs code file");
 		free(outfile);
 		err = -EIO;
 		goto close_infd;
 	}
 	free(outfile);
 
-	outfile = calloc(1, strlen(in->datafile) + strlen(".code.sw") + 1);
+	outfile = calloc(1, strlen(in->datafile) + strlen(".encode.code.sw") + 1);
 	if (!outfile) {
 		err_log("Failed to alloc outfile\n");
 		err = -ENOMEM;
@@ -89,7 +89,7 @@ static int open_io_files(struct inargs *in, struct encoder_context *ctx)
 	}
 
 	outfile = strcat(outfile, in->datafile);
-	outfile = strcat(outfile, ".code.sw");
+	outfile = strcat(outfile, ".encode.code.sw");
 	unlink(outfile);
 	ctx->outfd_sw = open(outfile, O_RDWR | O_CREAT, 0666);
 	if (ctx->outfd_sw < 0) {
@@ -100,24 +100,24 @@ static int open_io_files(struct inargs *in, struct encoder_context *ctx)
 	}
 	free(outfile);
 
-        outfile = calloc(1, strlen(in->datafile) + strlen(".code.lib") + 1);
-        if (!outfile) {
-                err_log("Failed to alloc outfile\n");
-                err = -ENOMEM;
-                goto close_infd;
-        }
+	outfile = calloc(1, strlen(in->datafile) + strlen(".encode.code.eco") + 1);
+	if (!outfile) {
+		err_log("Failed to alloc outfile\n");
+		err = -ENOMEM;
+		goto close_infd;
+	}
 
-        outfile = strcat(outfile, in->datafile);
-        outfile = strcat(outfile, ".code.lib");
-        unlink(outfile);
-        ctx->outfd_lib = open(outfile, O_RDWR | O_CREAT, 0666);
-        if (ctx->outfd_lib < 0) {
-                err_log("Failed to open sw code file");
-                free(outfile);
-                err = -EIO;
-                goto close_infd;
-        }
-        free(outfile);
+	outfile = strcat(outfile, in->datafile);
+	outfile = strcat(outfile, ".encode.code.eco");
+	unlink(outfile);
+	ctx->outfd_eco = open(outfile, O_RDWR | O_CREAT, 0666);
+	if (ctx->outfd_eco < 0) {
+		err_log("Failed to open eco code file");
+		free(outfile);
+		err = -EIO;
+		goto close_infd;
+	}
+	free(outfile);
 
 	return 0;
 
@@ -142,7 +142,7 @@ init_ctx(struct ibv_device *ib_dev, struct inargs *in)
 	ctx->context = ibv_open_device(ib_dev);
 	if (!ctx->context) {
 		err_log("Couldn't get context for %s\n",
-			ibv_get_device_name(ib_dev));
+				ibv_get_device_name(ib_dev));
 		goto free_ctx;
 	}
 
@@ -153,7 +153,7 @@ init_ctx(struct ibv_device *ib_dev, struct inargs *in)
 	}
 
 	ctx->ec_ctx = alloc_ec_ctx(ctx->pd, in->frame_size,
-				   in->k, in->m, in->w, 1, NULL);
+			in->k, in->m, in->w, 1, NULL);
 	if (!ctx->ec_ctx) {
 		err_log("Failed to allocate EC context\n");
 		goto dealloc_pd;
@@ -211,20 +211,20 @@ static int process_inargs(int argc, char *argv[], struct inargs *in)
 {
 	int err;
 	struct option long_options[11] = {
-		{ .name = "ib-dev",        .has_arg = 1, .val = 'i' },
-		{ .name = "datafile",      .has_arg = 1, .val = 'D' },
-		{ .name = "frame_size",    .has_arg = 1, .val = 's' },
-		{ .name = "data_blocks",   .has_arg = 1, .val = 'k' },
-		{ .name = "code_blocks",   .has_arg = 1, .val = 'm' },
-		{ .name = "gf",            .has_arg = 1, .val = 'w' },
-		{ .name = "debug",         .has_arg = 0, .val = 'd' },
-		{ .name = "verbose",       .has_arg = 0, .val = 'v' },
-		{ .name = "help",          .has_arg = 0, .val = 'h' },
-		{ .name = 0, .has_arg = 0, .val = 0 }
+			{ .name = "ib-dev",        .has_arg = 1, .val = 'i' },
+			{ .name = "datafile",      .has_arg = 1, .val = 'D' },
+			{ .name = "frame_size",    .has_arg = 1, .val = 's' },
+			{ .name = "data_blocks",   .has_arg = 1, .val = 'k' },
+			{ .name = "code_blocks",   .has_arg = 1, .val = 'm' },
+			{ .name = "gf",            .has_arg = 1, .val = 'w' },
+			{ .name = "debug",         .has_arg = 0, .val = 'd' },
+			{ .name = "verbose",       .has_arg = 0, .val = 'v' },
+			{ .name = "help",          .has_arg = 0, .val = 'h' },
+			{ .name = 0, .has_arg = 0, .val = 0 }
 	};
 
 	err = common_process_inargs(argc, argv, "i:D:E:s:k:m:w:hdv",
-				    long_options, in, usage);
+			long_options, in, usage);
 	if (err)
 		return err;
 
@@ -249,7 +249,7 @@ static int encode_file(struct encoder_context *ctx, struct eco_encoder *lib_enco
 
 	while (1) {
 		bytes = read(ctx->infd, ec_ctx->data.buf,
-			     ec_ctx->block_size * ec_ctx->attr.k);
+				ec_ctx->block_size * ec_ctx->attr.k);
 		if (bytes <= 0)
 			break;
 
@@ -259,8 +259,8 @@ static int encode_file(struct encoder_context *ctx, struct eco_encoder *lib_enco
 			return err;
 		}
 
-		bytes = write(ctx->outfd_off, ec_ctx->code.buf,
-			      ec_ctx->block_size * ec_ctx->attr.m);
+		bytes = write(ctx->outfd_verbs, ec_ctx->code.buf,
+				ec_ctx->block_size * ec_ctx->attr.m);
 		if (bytes < (int)ec_ctx->block_size * ec_ctx->attr.m) {
 			err_log("Failed write to fd1 (%d)\n", err);
 			return err;
@@ -274,7 +274,7 @@ static int encode_file(struct encoder_context *ctx, struct eco_encoder *lib_enco
 		}
 
 		bytes = write(ctx->outfd_sw, ec_ctx->code.buf,
-			      ec_ctx->block_size * ec_ctx->attr.m);
+				ec_ctx->block_size * ec_ctx->attr.m);
 		if (bytes < (int)ec_ctx->block_size * ec_ctx->attr.m) {
 			err_log("Failed write to fd2 (%d)\n", err);
 			return err;
@@ -283,12 +283,12 @@ static int encode_file(struct encoder_context *ctx, struct eco_encoder *lib_enco
 		// library encode
 		memset(ec_ctx->code.buf, 0, ec_ctx->block_size * ec_ctx->attr.m);
 		err = mlx_eco_encoder_encode(lib_encoder, ec_ctx->data_arr, ec_ctx->code_arr, ec_ctx->attr.k, ec_ctx->attr.m, ec_ctx->block_size);
-		bytes = write(ctx->outfd_lib, ec_ctx->code.buf,
-                              ec_ctx->block_size * ec_ctx->attr.m);
-                if (bytes < (int)ec_ctx->block_size * ec_ctx->attr.m) {
-                        err_log("Failed write to library fd (%d)\n", err);
-                        return err;
-                }
+		bytes = write(ctx->outfd_eco, ec_ctx->code.buf,
+				ec_ctx->block_size * ec_ctx->attr.m);
+		if (bytes < (int)ec_ctx->block_size * ec_ctx->attr.m) {
+			err_log("Failed write to library fd (%d)\n", err);
+			return err;
+		}
 		// done
 		memset(ec_ctx->data.buf, 0, ec_ctx->block_size * ec_ctx->attr.k);
 		memset(ec_ctx->code.buf, 0, ec_ctx->block_size * ec_ctx->attr.m);
@@ -305,12 +305,12 @@ static void set_buffers(struct encoder_context *ctx)
 	ec_ctx->data_arr = calloc(ec_ctx->attr.k, sizeof(*ec_ctx->data_arr));
 	ec_ctx->code_arr = calloc(ec_ctx->attr.m, sizeof(*ec_ctx->code_arr));
 
-        for (i = 0; i < ec_ctx->attr.k ; i++) {
-                ec_ctx->data_arr[i] = ec_ctx->data.buf + i * ec_ctx->block_size;
-        }
-        for (i = 0; i < ec_ctx->attr.m ; i++) {
-                ec_ctx->code_arr[i] = ec_ctx->code.buf + i * ec_ctx->block_size;
-        }
+	for (i = 0; i < ec_ctx->attr.k ; i++) {
+		ec_ctx->data_arr[i] = ec_ctx->data.buf + i * ec_ctx->block_size;
+	}
+	for (i = 0; i < ec_ctx->attr.m ; i++) {
+		ec_ctx->code_arr[i] = ec_ctx->code.buf + i * ec_ctx->block_size;
+	}
 }
 
 
@@ -339,20 +339,20 @@ int main(int argc, char *argv[])
 	struct eco_encoder *lib_encoder = mlx_eco_encoder_init(in.k, in.m, 1);	
 	if (!lib_encoder) {
 		err_log("mlx_eco_encoder_init failed\n");
-                return -ENOMEM;
+		return -ENOMEM;
 	}
 
-       // register buffers
-       err = mlx_eco_encoder_register(lib_encoder, ctx->ec_ctx->data_arr, ctx->ec_ctx->code_arr, in.k, in.m, ctx->ec_ctx->block_size);
-        if (err) {
-                err_log("mlx_ec_register_mrs failed to register\n");
+	// register buffers
+	err = mlx_eco_encoder_register(lib_encoder, ctx->ec_ctx->data_arr, ctx->ec_ctx->code_arr, in.k, in.m, ctx->ec_ctx->block_size);
+	if (err) {
+		err_log("mlx_ec_register_mrs failed to register\n");
 		return -ENOMEM;
-        }
+	}
 
-       // encode data
-       err = encode_file(ctx, lib_encoder);
-       if (err)
-               err_log("failed to encode file %s\n", in.datafile);
+	// encode data
+	err = encode_file(ctx, lib_encoder);
+	if (err)
+		err_log("failed to encode file %s\n", in.datafile);
 
 
 	mlx_eco_encoder_release(lib_encoder);
