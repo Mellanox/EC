@@ -34,7 +34,7 @@
 	<exec executable="/bin/sh" failonerror="true">
                 <arg value="-c" />
                 <arg value="gcc -g -ggdb -Wall -W -D_GNU_SOURCE -shared -fpic -I /usr/include/jerasure -o build/lib/libHdfsEcOffload.so -libverbs -lgf_complete -lJerasure -lrdmacm -lecOffload
-				-I $JAVA_HOME/include -I $JAVA_HOME/include/linux build/c/Mellanox*.c -fPIC build/c/ec_*.c "/>
+				-I $JAVA_HOME/include -I $JAVA_HOME/include/linux build/c/Mellanox*.c"/>
         </exec>
         <exec executable="/bin/sh">
                 <arg value="-c" />

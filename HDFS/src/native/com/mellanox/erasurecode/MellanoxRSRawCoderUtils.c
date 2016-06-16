@@ -34,7 +34,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "ec_utils.h"
+#include "MellanoxRSRawCoderUtils.h"
 
 static int check_nulls(JNIEnv *env, jobjectArray inputs, int erasures_size) {
 	int i, sum_nulls = 0;

@@ -30,8 +30,8 @@
  * SOFTWARE.
  */
 
-#ifndef _EC_UTILS_H_
-#define _EC_UTILS_H_
+#ifndef _MellanoxRSRawCoderUtils_H_
+#define _MellanoxRSRawCoderUtils_H_
 
 #include <string.h>
 #include <jni.h>
@@ -74,4 +74,4 @@ void decoder_get_buffers(JNIEnv *env, jobjectArray inputs, jintArray inputOffset
 void encoder_get_buffers(JNIEnv *env, jobjectArray inputs, jintArray inputOffsets, jobjectArray outputs,
 		jintArray outputOffsets, struct mlx_coder_data *encoder_data);
 
-#endif //_EC_UTILS_H
+#endif //_MellanoxRSRawCoderUtils_H

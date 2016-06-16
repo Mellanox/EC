@@ -30,7 +30,7 @@
  * SOFTWARE.
  */
 
-#include "ec_utils.h"
+#include "MellanoxRSRawCoderUtils.h"
 #include <ecOffload/eco_decoder.h>
 #include "com_mellanox_erasurecode_rawcoder_MellanoxRSRawDecoder.h"
 
