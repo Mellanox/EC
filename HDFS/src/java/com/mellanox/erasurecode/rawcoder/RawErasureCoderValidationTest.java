@@ -337,10 +337,10 @@ public class RawErasureCoderValidationTest {
 
 			erasuresItr = 0;
 			// write to data file
-			for (int i = 0 ; i < numData && bytesLeft > 0; i++) {
+			for (int i = 0 ; i < numData; i++) {
 				buffer = decodeInputs[i] != null ? decodeInputs[i] : decodeOutputs[erasuresItr++];
 				buffer.limit(Math.min(buffer.limit(), (int)bytesLeft));
-				bytesLeft -= inputfileOutChannel.write(buffer);
+				bytesLeft -= bytesLeft > 0 ? inputfileOutChannel.write(buffer): 0;
 			}
 
 			// write to code file
