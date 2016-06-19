@@ -19,11 +19,6 @@
 #include <ecOffload/eco_encoder.h>
 #include "com_mellanox_erasurecode_rawcoder_MellanoxRSRawEncoder.h"
 
-struct mlx_encoder {
-	struct eco_encoder *encoder_ctx;
-	struct mlx_coder_data encoder_data;
-};
-
 JNIEXPORT void JNICALL
 Java_com_mellanox_erasurecode_rawcoder_MellanoxRSRawEncoder_initImpl(
 		JNIEnv *env, jobject thiz, jint numDataUnits, jint numParityUnits){
@@ -57,7 +52,7 @@ Java_com_mellanox_erasurecode_rawcoder_MellanoxRSRawEncoder_encodeImpl(
 	struct mlx_coder_data *encoder_data = &mlx_encoder->encoder_data;
 	int err;
 
-	encoder_get_buffers(env, inputs, inputOffsets, outputs, outputOffsets, encoder_data);
+	encoder_get_buffers(env, mlx_encoder, inputs, inputOffsets, outputs, outputOffsets);
 	PASS_EXCEPTIONS(env);
 
 	err = mlx_eco_encoder_encode(mlx_encoder->encoder_ctx, encoder_data->data, encoder_data->coding,

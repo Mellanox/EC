@@ -22,6 +22,7 @@
 #include <jni.h>
 
 #define USE_VANDERMONDE_MATRIX 1
+#define TMP_BUFFERS_SIZE 2097152 // 2MB
 
 #define THROW(env, exception_name, message) \
 		{ \
@@ -45,6 +46,21 @@ struct mlx_coder_data {
 	int coding_size;
 };
 
+struct mlx_encoder {
+	struct eco_encoder *encoder_ctx;
+	struct mlx_coder_data encoder_data;
+};
+
+struct mlx_decoder {
+	struct eco_decoder *decoder_ctx;
+	struct mlx_coder_data decoder_data;
+	unsigned char *tmp_arrays; // The amount of the buffers is equal to the coding array size.
+	int tmp_arrays_size; // The size of each buffer in tmp_arrays.
+	int *erasures_indexes; // The size is equal to data_size + coding_size.
+	int *decode_erasures;
+	int  decode_erasures_size; // The actual size of the decode_erasures array.
+};
+
 int allocate_coder_data(struct mlx_coder_data* coder_data, int data_size, int coding_size);
 
 void free_coder_data(struct mlx_coder_data* coder_data);
@@ -53,10 +69,10 @@ void set_context(JNIEnv* env, jobject thiz, void* context);
 
 void* get_context(JNIEnv* env, jobject thiz);
 
-void decoder_get_buffers(JNIEnv *env, jobjectArray inputs, jintArray inputOffsets, jobjectArray outputs,
-		jintArray outputOffsets, int erasures_size, struct mlx_coder_data *decoder_data);
+void encoder_get_buffers(JNIEnv *env, struct mlx_encoder *mlx_encoder, jobjectArray inputs, jintArray inputOffsets, jobjectArray outputs,
+		jintArray outputOffsets);
 
-void encoder_get_buffers(JNIEnv *env, jobjectArray inputs, jintArray inputOffsets, jobjectArray outputs,
-		jintArray outputOffsets, struct mlx_coder_data *encoder_data);
+void decoder_get_buffers(JNIEnv *env, struct mlx_decoder *mlx_decoder, jobjectArray inputs, jintArray inputOffsets, jobjectArray outputs,
+		jintArray outputOffsets, jintArray erasedIndexes, int block_size);
 
 #endif //_MellanoxRSRawCoderUtils_H

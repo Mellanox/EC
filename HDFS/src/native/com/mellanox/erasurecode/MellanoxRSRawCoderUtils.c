@@ -21,19 +21,37 @@
 
 #include "MellanoxRSRawCoderUtils.h"
 
-static int check_nulls(JNIEnv *env, jobjectArray inputs, int erasures_size) {
-	int i, sum_nulls = 0;
-	jobject byteBuffer;
-	int num_buffers = (*env)->GetArrayLength(env, inputs);
+static void prepare_decoder_data(JNIEnv *env, struct mlx_decoder *mlx_decoder, jobjectArray inputs, int *input_erasures, int input_erasures_size, int block_size){
+	int  i;
+	int num_inputs = (*env)->GetArrayLength(env, inputs);
 
-	for (i = 0; i < num_buffers; i++) {
-		byteBuffer = (*env)->GetObjectArrayElement(env, inputs, i);
-		if (byteBuffer == NULL) {
-			sum_nulls++;
-		}
+	memset(mlx_decoder->erasures_indexes, -1 , sizeof(int) * num_inputs);
+	for (i = 0 ; i < input_erasures_size ; i++) {
+		mlx_decoder->erasures_indexes[input_erasures[i]] = i;
 	}
 
-	return sum_nulls != erasures_size;
+	// Allocate new tmp_arrays if needed.
+	if (block_size > mlx_decoder->tmp_arrays_size) {
+		int input_nulls = 0;
+		jobject byteBuffer;
+
+		for (i = 0 ; i < num_inputs ; i++) {
+			byteBuffer = (*env)->GetObjectArrayElement(env, inputs, i);
+			if (byteBuffer == NULL) {
+				input_nulls++;
+			}
+		}
+
+		if(input_nulls > input_erasures_size) {
+			unsigned char *tmp_arrays = calloc(mlx_decoder->decoder_data.coding_size, block_size);
+			if (!tmp_arrays) {
+				THROW(env, "java/lang/InternalError", "Failed to allocate tmp_arrays object");
+			}
+			free(mlx_decoder->tmp_arrays);
+			mlx_decoder->tmp_arrays = tmp_arrays;
+			mlx_decoder->tmp_arrays_size = block_size;
+		}
+	}
 }
 
 static void encoder_get_buffers_helper(JNIEnv *env, jobjectArray buffers, jintArray buffersOffsets, unsigned char** dest_buffers, int bufffer_size) {
@@ -53,25 +71,34 @@ static void encoder_get_buffers_helper(JNIEnv *env, jobjectArray buffers, jintAr
 	}
 }
 
-static void decoder_get_buffers_helper(JNIEnv *env, jobjectArray inputs, int* input_offsets, jobjectArray outputs, int* output_offsets,
-		unsigned char** dest_buffers, int* output_itr, int dest_size, int offset) {
+static void decoder_get_buffers_helper(JNIEnv *env, jobjectArray inputs, int *input_offsets, jobjectArray outputs, int *output_offsets,
+		unsigned char **dest_buffers, int **decode_erasures, int *erasures_indexes, unsigned char **tmp_arrays,
+		int offset, int dest_size, int block_size) {
 	jobject byteBuffer;
 	int i;
 
 	for (i = 0 ; i < dest_size ; i++) {
 		byteBuffer = (*env)->GetObjectArrayElement(env, inputs, i + offset);
-		if (byteBuffer != NULL) {
+		if (byteBuffer != NULL) { // Available buffer
 			dest_buffers[i] = (unsigned char *)((*env)->GetDirectBufferAddress(env, byteBuffer));
 			dest_buffers[i] += input_offsets[i + offset];
-		} else {
-			byteBuffer = (*env)->GetObjectArrayElement(env, outputs, *output_itr);
+			continue;
+		}
+
+		if (erasures_indexes[i + offset] == -1) { // NULL buffer - The client did not ask to compute it.
+			dest_buffers[i] = *tmp_arrays;
+			*tmp_arrays += block_size;
+		}
+		else { // NULL buffer - The client asked to compute it.
+			byteBuffer = (*env)->GetObjectArrayElement(env, outputs, erasures_indexes[i + offset]);
 			if (byteBuffer == NULL) {
 				THROW(env, "java/lang/InternalError", "decoder_get_buffers got null output buffer");
 			}
 			dest_buffers[i] = (unsigned char *)((*env)->GetDirectBufferAddress(env, byteBuffer));
-			dest_buffers[i] += output_offsets[*output_itr];
-			(*output_itr)++;
+			dest_buffers[i] += output_offsets[erasures_indexes[i + offset]];
 		}
+		**decode_erasures = i  + offset;
+		(*decode_erasures)++;
 	}
 }
 
@@ -124,36 +151,47 @@ void* get_context(JNIEnv* env, jobject thiz) {
 	return context;
 }
 
-void decoder_get_buffers(JNIEnv *env, jobjectArray inputs, jintArray inputOffsets, jobjectArray outputs,
-		jintArray outputOffsets, int erasures_size, struct mlx_coder_data *decoder_data) {
-	int num_inputs = (*env)->GetArrayLength(env, inputs);
-	int num_outputs = (*env)->GetArrayLength(env, outputs);
-	int* tmp_input_offsets, *tmp_output_offsets;
-	int err, outputItr = 0;
+void decoder_get_buffers(JNIEnv *env,  struct mlx_decoder *mlx_decoder, jobjectArray inputs, jintArray inputOffsets, jobjectArray outputs,
+		jintArray outputOffsets, jintArray erasedIndexes, int block_size) {
+	int num_inputs, num_outputs, input_erasures_size;
+	int  *input_erasures, *tmp_input_offsets, *tmp_output_offsets, *decode_erasures;
+	unsigned char *tmp_arrays;
+	struct mlx_coder_data *decoder_data = &mlx_decoder->decoder_data;
+
+	num_inputs = (*env)->GetArrayLength(env, inputs);
+	num_outputs = (*env)->GetArrayLength(env, outputs);
+	input_erasures_size = (*env)->GetArrayLength(env, erasedIndexes);
+	input_erasures = (int*)(*env)->GetIntArrayElements(env, erasedIndexes, NULL);
+	decode_erasures = mlx_decoder->decode_erasures;
 
 	if (num_inputs != decoder_data->data_size + decoder_data->coding_size) {
 		THROW(env, "java/lang/InternalError", "Invalid inputs");
 	}
 
-	if (num_outputs != erasures_size) {
+	if (num_outputs != input_erasures_size) {
 		THROW(env, "java/lang/InternalError", "Invalid outputs");
 	}
 
-	err = check_nulls(env, inputs, erasures_size);
-	if (err) {
-		THROW(env, "java/lang/InternalError", "Got to many null input buffers");
-	}
+	prepare_decoder_data(env, mlx_decoder, inputs, input_erasures, input_erasures_size, block_size);
+	PASS_EXCEPTIONS(env);
 
+	tmp_arrays = mlx_decoder->tmp_arrays;
 	tmp_input_offsets = (int*)(*env)->GetIntArrayElements(env, inputOffsets, NULL);
 	tmp_output_offsets = (int*)(*env)->GetIntArrayElements(env, outputOffsets, NULL);
 
-	decoder_get_buffers_helper(env, inputs, tmp_input_offsets, outputs, tmp_output_offsets, decoder_data->data, &outputItr, decoder_data->data_size, 0);
+	decoder_get_buffers_helper(env, inputs, tmp_input_offsets, outputs, tmp_output_offsets, decoder_data->data, &decode_erasures,
+			mlx_decoder->erasures_indexes, &tmp_arrays, 0, decoder_data->data_size, block_size);
 	PASS_EXCEPTIONS(env);
-	decoder_get_buffers_helper(env, inputs, tmp_input_offsets, outputs, tmp_output_offsets, decoder_data->coding, &outputItr, decoder_data->coding_size , decoder_data->data_size);
+	decoder_get_buffers_helper(env, inputs, tmp_input_offsets, outputs, tmp_output_offsets, decoder_data->coding, &decode_erasures,
+			mlx_decoder->erasures_indexes, &tmp_arrays, decoder_data->data_size, decoder_data->coding_size, block_size);
+
+	mlx_decoder->decode_erasures_size =  decode_erasures - mlx_decoder->decode_erasures;
 }
 
-void encoder_get_buffers(JNIEnv *env, jobjectArray inputs, jintArray inputOffsets, jobjectArray outputs,
-		jintArray outputOffsets, struct mlx_coder_data *encoder_data) {
+void encoder_get_buffers(JNIEnv *env, struct mlx_encoder *mlx_encoder, jobjectArray inputs, jintArray inputOffsets,
+		jobjectArray outputs, jintArray outputOffsets) {
+	struct mlx_coder_data *encoder_data = &mlx_encoder->encoder_data;
+
 	int num_inputs = (*env)->GetArrayLength(env, inputs);
 	int num_outputs = (*env)->GetArrayLength(env, outputs);
 

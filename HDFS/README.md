@@ -13,7 +13,7 @@ Erasure Coding operations are very CPU intensive actions and can be a major over
 
 ### Limitations
 1. Erasure Coding NIC Offload library limitations.
-2. (Decode) The number of NULL input buffers must be equal to the number of the output buffers. 
+2. Decode also redundant blocks. 
 
 ### Installation and Usage
 1. cd HDFS
