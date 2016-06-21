@@ -15,8 +15,8 @@ This library also contains a plugin for Hadoop Distributed File System (HDFS).
 ### Recommendations
 1. install Jerasure & GF-Complete using the following parameters:  
     
-        ./configure --prefix=/usr/ --libdir=/lib64
-2. It is highly recommended to install ConnectX®-4 on PCIe3.0 x16 , and ConnectX®-4 Lx on PCIe3.0 x8 slot for better performance.
+        ./configure --prefix=/usr/ --libdir=/usr/lib64/
+2. It is highly recommended to install ConnectX®-4 on PCIe3.0 x16, and ConnectX®-4 Lx on PCIe3.0 x8 slot for better performance.
 
 ### Limitations
 1. Buffers must be align to 64 bytes.
@@ -30,7 +30,7 @@ This library also contains a plugin for Hadoop Distributed File System (HDFS).
 ### Tests
 
 **Build**  
-1. cd tests
+1. cd tests  
 2. make
 
 **ibv_ec_capability_test**
