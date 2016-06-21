@@ -44,6 +44,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 /**
+ * This is a modified version of RawErasureCoderBenchmark (HADOOP-11588) which supports MellanoxRSRawErasureCoderFactory.
+ * The changes are:
+ *	1. Add Mellanox EC Offloader to the available coder list.
+ *	2. Create encoder/decoder for each client instead one encoder/decoder for all clients.
+ *	3. initialize coders using 64 bytes arrays (because of the buffer alignment limitation).
+ *
  * A benchmark tool to test the performance of different erasure coders.
  * The tool launches multiple threads to encode/decode certain amount of data,
  * and measures the total throughput. It only focuses on performance and doesn't
@@ -230,12 +236,12 @@ public final class RawErasureCoderBenchmark {
     } else {
       RawErasureDecoder decoder = CODER_MAKERS.get(index).createDecoder(
           BenchData.NUM_DATA_UNITS, BenchData.NUM_PARITY_UNITS);
-      byte[][] inputs = new byte[BenchData.NUM_ALL_UNITS][1];
+      byte[][] inputs = new byte[BenchData.NUM_ALL_UNITS][64];
       for (int erasedIndex : BenchData.ERASED_INDEXES) {
         inputs[erasedIndex] = null;
       }
       decoder.decode(inputs, BenchData.ERASED_INDEXES,
-          new byte[BenchData.ERASED_INDEXES.length][1]);
+          new byte[BenchData.ERASED_INDEXES.length][64]);
       return decoder;
     }
   }
