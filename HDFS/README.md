@@ -44,7 +44,7 @@ Perfrom encode/decode operations on input files using Hadoop coders.
 
     RawErasureCoderValidationTest usage:
     Encode : encode <coderIndex> <num data blocks> <num code blocks> <chunkSize-in-B> <input file>
-    Decode : decode <coderIndex> <num data blocks> <num code blocks> <chunkSize-in-B> <input file> <encoded file> <comma separated erasures>
+    Decode : decode <coderIndex> <num data blocks> <num code blocks> <chunkSize-in-B> <input file> <encoded file> <comma separated erasures> <comma separated redundant>
 
     Available coders with coderIndex:
     0:Dummy coder
@@ -69,16 +69,16 @@ The encoded data will be writen into <inputFile>.<coderIndex>.encode.code.
     
 _Decode_ 
 
-    $HADOOP_HOME/bin/hadoop jar $HADOOP_HOME/share/hadoop/common/lib/MellanoxECOffload.jar com/mellanox/erasurecode/rawcoder/RawErasureCoderValidationTest decode 3 6 3 64 file_to_encode.txt file_to_encode.txt.3.encode.code 1,0,0,1,0,0,0,1
+    $HADOOP_HOME/bin/hadoop jar $HADOOP_HOME/share/hadoop/common/lib/MellanoxECOffload.jar com/mellanox/erasurecode/rawcoder/RawErasureCoderValidationTest decode 3 6 3 64 file_to_encode.txt file_to_encode.txt.3.encode.code 1,8 3
         
     16/06/14 16:07:24 INFO rawcoder.MellanoxECLibraryLoader: Using Mellanox Erasure Coding Offload plugin
     Performing decode with the following parameters :
-    coderIndex = 3, numData = 6, numCode = 3, chunkSizeB = 64, inputFile = file_to_encode.txt , encodedFile = file_to_encode.txt.3.encode.code, erasures = 1,0,0,1,0,0,0,1
+    coderIndex = 3, numData = 6, numCode = 3, chunkSizeB = 64, inputFile = file_to_encode.txt , encodedFile = file_to_encode.txt.3.encode.code, erasures = 1,8, redundant = 3
     Test Complete
 
 The test will allocate  _numData_ buffers used for the data, _numCode_ used for the encoded data (chunkSizeB bytes each) and decoder specified by the user.   
 Then, it will read  _numData_ * _chunkSizeB_ bytes from  _inputFile_ and  _numCode_ * _chunkSizeB_ bytes from  _encodedFile_.
-Then, it will erase the blocks corresponding to _erasures_ and compute them.
+Then, it will erase the blocks corresponding to _erasures_ and compute them without using the _redundant_ blocks.
 
 The decoded data will be written into <inputFile>.<coderIndex>.decode.data (Should be equal to the _inputFile_).  
 The decoded code data will be written into <inputFile>.<coderIndex>.decode.code (Should be equal to the _encodedFile_).

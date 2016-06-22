@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -46,6 +45,7 @@ public class RawErasureCoderValidationTest {
 	}
 
 	private static final byte zero = 0;
+	private static int coderIndex = 0, chunkSizeB = 0, numData = 0, numCode = 0;
 
 	private static final List<RawErasureCoderFactory> CODER_MAKERS =
 			Collections.unmodifiableList(
@@ -76,18 +76,82 @@ public class RawErasureCoderValidationTest {
 		}
 	}
 
-	private static RawErasureCoder getAndInitCoder(int index, boolean encode, int numData, int numCode) {
+	private static int getPlaceInArray(int[] erasures, int val) {
+		for (int i = 0 ; i < erasures.length ; i++) {
+			if (erasures[i] == val) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	private static boolean containsDuplicates(int[] arr) {
+		for (int i = 0 ; i < arr.length - 1; i++)
+			for (int j = i + 1 ; j < arr.length ; j++)
+				if (arr[i] == arr[j])
+					return true;
+
+		return false;
+	}
+
+	private static boolean containsDuplicates(int[] arr1, int[] arr2) {
+		for (int i = 0 ; i < arr1.length; i++)
+			for (int j = 0 ; j < arr2.length ; j++)
+				if (arr1[i] == arr2[j])
+					return true;
+
+		return false;
+	}
+
+	private static int[] extractIntArray(String devices, int lastArraySize) {
+		String[] splitDevices;
+		int[] resultArray;
+		boolean hasCodeIndex = false;
+		int value;
+
+		splitDevices = devices.split(",");
+		if (splitDevices.length + lastArraySize >  numCode) {
+			usage("Erasures + redundant size cannot exceeds the total number of code blocks");
+		}
+
+		resultArray = new int[splitDevices.length];
+
+		for (int i = 0 ; i < splitDevices.length ; i++) {
+			try {
+				value = Integer.parseInt(splitDevices[i]);
+				if (value < 0 || value > numData + numCode - 1) {
+					usage("Erasures/redundant values must be in the range [0 , numData + numCode - 1 ] separated by comma");
+				}
+				if (value >= numData) {
+					hasCodeIndex = true;
+				} else {
+					if (hasCodeIndex) {
+						usage("Erasures/redundant data units should be first or before the parity units");
+					}
+				}
+				resultArray[i] = value;
+			} catch (NumberFormatException e) {
+				usage("Erasures/redundant values must be in the range [0 , numData + numCode - 1] separated by comma, " + e.getMessage());
+			}
+		}
+
+		if (containsDuplicates(resultArray))
+			usage("Duplicate Erasures/redundant are not allowed");
+		return resultArray;
+	}
+
+	private static RawErasureCoder getAndInitCoder(boolean encode) {
 		if (encode) {
-			return CODER_MAKERS.get(index).createEncoder(numData, numCode);
+			return CODER_MAKERS.get(coderIndex).createEncoder(numData, numCode);
 		} else {
-			return CODER_MAKERS.get(index).createDecoder(numData, numCode);
+			return CODER_MAKERS.get(coderIndex).createDecoder(numData, numCode);
 		}
 	}
 
-	private static ByteBuffer[] allocateBuffers(boolean useDirectBuffer, int length, int sizeB) {
+	private static ByteBuffer[] allocateBuffers(boolean useDirectBuffer, int length) {
 		ByteBuffer[] buffersArray = new ByteBuffer[length];
 		for (int i = 0 ; i < length ; i ++) {
-			buffersArray[i] = useDirectBuffer ? ByteBuffer.allocateDirect(sizeB) : ByteBuffer.allocate(sizeB);
+			buffersArray[i] = useDirectBuffer ? ByteBuffer.allocateDirect(chunkSizeB) : ByteBuffer.allocate(chunkSizeB);
 		}
 		return buffersArray;
 	}
@@ -107,18 +171,15 @@ public class RawErasureCoderValidationTest {
 		System.out.println(
 				"\nRawErasureCoderValidationTest usage:\n" +
 				"Encode : encode <coderIndex> <num data blocks> <num code blocks> <chunkSize-in-B> <input file>\n" +
-				"Decode : decode <coderIndex> <num data blocks> <num code blocks> <chunkSize-in-B> <input file> <encoded file> <comma sepereated erasures>\n");
+				"Decode : decode <coderIndex> <num data blocks> <num code blocks> <chunkSize-in-B> <input file> <encoded file> <comma separated erasures> <comma separated redundant>\n");
 		printAvailableCoders();
 		System.exit(1);
 	}
 
 	public static void main(String[] args) {
-		String opType = null, inputFile, encodedFile = null, parameters;
-		int coderIndex = 0, chunkSizeB = 0, numData = 0, numCode = 0, erasureValue;;
+		String opType = null, inputFile, encodedFile = null, parameters, erasuresStr = null, redundantStr = null;
 		RandomAccessFile inputFileReader = null, encodedfileReader = null;
-		ArrayList<Integer> erasuresList = new ArrayList<Integer>();
-		int[] erasuresArray = null;
-		String[] splitDevices;
+		int[] erasuresArray = null, redundantArray = new int[0];
 		RawErasureCoder coder;
 
 		if (args.length == 0 || args[0].equals("--help")) {
@@ -133,8 +194,8 @@ public class RawErasureCoderValidationTest {
 
 		if ("encode".equals(opType) && args.length != 6) {
 			usage("args size for encode operation must be equal to 6");
-		} else if ("decode".equals(opType) && args.length != 8) {
-			usage("args size for decode operation must be equal to 8");
+		} else if ("decode".equals(opType) && args.length != 8 && args.length != 9) {
+			usage("args size for decode operation must be equal to 8/9");
 		}
 
 		// coder index
@@ -208,49 +269,32 @@ public class RawErasureCoderValidationTest {
 			}
 
 			// extract erasures
-			splitDevices = args[7].split(",");
-			if (splitDevices.length > numData + numCode) {
-				usage("Erasures size cannot exceeds the total number of blocks");
-			}
+			erasuresStr = args[7];
+			erasuresArray = extractIntArray(erasuresStr, 0 );
 
-			for (int i = 0 ; i < splitDevices.length ; i++) {
-				try {
-					erasureValue = Integer.parseInt(splitDevices[i]);
-					if (erasureValue != 1 && erasureValue != 0) {
-						usage("Erasures must be 0/1 saparated by comma");
-					}
-					if (erasureValue == 1) {
-						erasuresList.add(i);
-					}
-				} catch (NumberFormatException e) {
-					usage("Erasures must be 0/1 saparated by comma, " + e.getMessage());
+			if (args.length == 9) {
+				redundantStr = args[8];
+				redundantArray = extractIntArray(redundantStr, erasuresArray.length);
+
+				if (containsDuplicates(erasuresArray, redundantArray)) {
+					usage("Duplicate Erasures/redundant are not allowed");
 				}
 			}
-
-			if (erasuresList.size() > numCode) {
-				usage("Erasures devices cannot exceeds the number of code blocks");
-			}
-
-			erasuresArray = new int[erasuresList.size()];
-			for (int i = 0 ; i < erasuresList.size(); i ++) {
-				erasuresArray[i] = erasuresList.get(i);
-			}
-
 		}
-
-		coder = getAndInitCoder(coderIndex, isEncode, numData, numCode);
+		coder = getAndInitCoder(isEncode);
 
 		parameters = String.format("coderIndex = %d, numData = %d, numCode = %d, chunkSizeB = %d, inputFile = %s", coderIndex, numData, numCode, chunkSizeB, inputFile);
 
 		try {
 			if (isEncode) {
 				System.out.println(String.format("Performing encode with the following parameters :\n%s", parameters));
-				performEncode((RawErasureEncoder) coder, numData, numCode, chunkSizeB, inputFileReader, inputFile, coderIndex);
+				performEncode((RawErasureEncoder) coder, inputFileReader, inputFile);
 			} else {
-				System.out.println(String.format("Performing decode with the following parameters :\n%s , encodedFile = %s, erasures = %s", parameters, encodedFile, args[7]));
-				performDecode((RawErasureDecoder) coder,  numData, numCode, chunkSizeB, inputFileReader, inputFile, encodedfileReader, erasuresArray, coderIndex);
+				System.out.println(String.format("Performing decode with the following parameters :\n%s , encodedFile = %s, erasures = %s, redundant = %s", parameters, encodedFile, erasuresStr, redundantStr));
+				performDecode((RawErasureDecoder) coder, inputFileReader, inputFile, encodedfileReader, erasuresArray, redundantArray);
 			}
 			System.out.println("Test Complete");
+			System.exit(0);
 		} catch (IOException e) {
 			System.out.println("Test Failed !");
 			e.printStackTrace();
@@ -268,11 +312,10 @@ public class RawErasureCoderValidationTest {
 	 * @param fileReader input file for encode operation
 	 * @throws IOException
 	 */
-	public static void performEncode(RawErasureEncoder encoder, int numData, int numCode, int chunkSizeB,
-			RandomAccessFile fileReader, String inputFile, int coderIndex) throws IOException {
+	public static void performEncode(RawErasureEncoder encoder, RandomAccessFile fileReader, String inputFile) throws IOException {
 		boolean isDirect = (Boolean) encoder.getCoderOption(CoderOption.PREFER_DIRECT_BUFFER);
-		ByteBuffer[] inputs = allocateBuffers(isDirect, numData, chunkSizeB);
-		ByteBuffer[] outputs = allocateBuffers(isDirect, numCode, chunkSizeB);
+		ByteBuffer[] inputs = allocateBuffers(isDirect, numData);
+		ByteBuffer[] outputs = allocateBuffers(isDirect, numCode);
 		FileChannel inChannel = fileReader.getChannel();
 		FileOutputStream fileOutputStream = new FileOutputStream(new File(inputFile + "." + coderIndex + ".encode.code"));
 		FileChannel outChannel = fileOutputStream.getChannel();
@@ -303,16 +346,15 @@ public class RawErasureCoderValidationTest {
 		fileOutputStream.close();
 	}
 
-	public static void performDecode(RawErasureDecoder decoder, int numData, int numCode, int chunkSizeB,
-			RandomAccessFile inputFileReader, String inputFile, RandomAccessFile encodedFileReader,
-			int[] erasuresArray, int coderIndex) throws IOException {
+	public static void performDecode(RawErasureDecoder decoder, RandomAccessFile inputFileReader, String inputFile, RandomAccessFile encodedFileReader,
+			int[] erasuresArray, int[] redundantArray) throws IOException {
 
 		boolean isDirect = (Boolean) decoder.getCoderOption(CoderOption.PREFER_DIRECT_BUFFER);
 
-		ByteBuffer[] inputFileInputs = allocateBuffers(isDirect, numData, chunkSizeB);
-		ByteBuffer[] encodedFileInputs = allocateBuffers(isDirect, numCode, chunkSizeB);
-		ByteBuffer[] decodeInputs = allocateBuffers(isDirect, numData + numCode, chunkSizeB);
-		ByteBuffer[] decodeOutputs = allocateBuffers(isDirect, erasuresArray.length, chunkSizeB);
+		ByteBuffer[] inputFileInputs = allocateBuffers(isDirect, numData);
+		ByteBuffer[] encodedFileInputs = allocateBuffers(isDirect, numCode);
+		ByteBuffer[] decodeInputs = allocateBuffers(isDirect, numData + numCode);
+		ByteBuffer[] decodeOutputs = allocateBuffers(isDirect, erasuresArray.length);
 
 		FileChannel inputFileChannel = inputFileReader.getChannel();
 		FileChannel encodedFileChannel = encodedFileReader.getChannel();
@@ -323,7 +365,6 @@ public class RawErasureCoderValidationTest {
 		FileOutputStream encodedFileOutputStream = new FileOutputStream(new File(inputFile + "." + coderIndex + ".decode.code"));
 		FileChannel encodedFileOutChannel = encodedFileOutputStream.getChannel();
 
-		int erasuresItr;
 		long bytesLeft;
 
 		ByteBuffer buffer;
@@ -345,6 +386,11 @@ public class RawErasureCoderValidationTest {
 				decodeInputs[erasedIndex] = null;
 			}
 
+			// unset redundant indexes
+			for (int redundant: redundantArray) {
+				decodeInputs[redundant] = null;
+			}
+
 			// perform decode
 			decoder.decode(decodeInputs, erasuresArray, decodeOutputs);
 
@@ -352,17 +398,21 @@ public class RawErasureCoderValidationTest {
 			resetBuffers(decodeInputs);
 			resetBuffers(decodeOutputs);
 
-			erasuresItr = 0;
+			// set redundant indexes
+			for (int redundant: redundantArray) {
+				decodeInputs[redundant] = redundant < numData ? inputFileInputs[redundant].duplicate() : encodedFileInputs[redundant - numData].duplicate() ;
+			}
+
 			// write to data file
 			for (int i = 0 ; i < numData; i++) {
-				buffer = decodeInputs[i] != null ? decodeInputs[i] : decodeOutputs[erasuresItr++];
+				buffer = decodeInputs[i] != null ? decodeInputs[i] : decodeOutputs[getPlaceInArray(erasuresArray, i)];
 				buffer.limit(Math.min(buffer.limit(), (int)bytesLeft));
 				bytesLeft -= bytesLeft > 0 ? inputfileOutChannel.write(buffer): 0;
 			}
 
 			// write to code file
 			for (int i = numData ; i < numData + numCode ; i++) {
-				buffer = decodeInputs[i] != null ? decodeInputs[i] : decodeOutputs[erasuresItr++];
+				buffer = decodeInputs[i] != null ? decodeInputs[i] : decodeOutputs[getPlaceInArray(erasuresArray, i)];
 				encodedFileOutChannel.write(buffer);
 			}
 
