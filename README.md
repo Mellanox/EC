@@ -17,11 +17,11 @@ This library also contains a plugin for Hadoop Distributed File System (HDFS).
     
         ./configure --prefix=/usr/ --libdir=/usr/lib64/
 2. It is highly recommended to install ConnectX®-4 on PCIe3.0 x16, and ConnectX®-4 Lx on PCIe3.0 x8 slot for better performance.
+3. Use block size aligned to 64 bytes to avoid copying to remainder to internal buffers.
 
 ### Limitations
-1. Buffers must be align to 64 bytes.
-2. Thread safety - Single thread per encoder/decoder.
-3. Using mlx5_0 device as default.
+1. Thread safety - Single thread per encoder/decoder.
+2. Using mlx5_0 device as default.
 
 ### Build
 1. make
@@ -48,9 +48,9 @@ Checking EC offload capabilities for IB devices.
 Perform encode operations on input files using Erasure Coding NIC Offload library, Erasure Coding Offload
 Experimental Verbs API and Jerasure library.  
 Galois field GF(2^w) must be equal to GF(2^4).  
-The test will encode the input file three times (all the results should be equal):
-1. using Erasure Coding NIC Offload library - the results will be written into <inputFile>.encode.code.eco
-2. using Experimental Verbs API - the results will be written into <inputFile>.encode.code.verbs
+The test will encode the input file three times (all the results should be equal):  
+1. using Erasure Coding NIC Offload library - the results will be written into <inputFile>.encode.code.eco  
+2. using Experimental Verbs API - the results will be written into <inputFile>.encode.code.verbs  
 3. using Jerasure Library - the results will be written into <inputFile>.encode.code.sw
 
 *Usage*  
@@ -74,9 +74,9 @@ The test will encode the input file three times (all the results should be equal
 Perform decode operations on input files using Erasure Coding NIC Offload library and Erasure Coding Offload
 Experimental Verbs API.  
 Galois field GF(2^w) must be equal to GF(2^4).  
-The test will decode the input file two times (The code result should be equal to the input code file, data results should be equal to the input file):
+The test will decode the input file two times (The code result should be equal to the input code file, data results should be equal to the input file):  
 1. using  Erasure Coding NIC Offload library - the data results will be written into <inputFile>.decode.data.eco  
-                                               the code results will be written into <inputFile>.decode.code.eco
+                                               the code results will be written into <inputFile>.decode.code.eco  
 2. using Experimental Verbs API - the data results will be written into <inputFile>.decode.data.verbs
 
 *Usage*  

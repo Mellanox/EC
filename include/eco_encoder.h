@@ -51,6 +51,7 @@ struct eco_encoder *mlx_eco_encoder_init(int k, int m, int use_vandermonde_matri
 
 /**
  * Register buffers and update the memory layout context for future encode/decode operations.
+ * Because the HW can perform encode/decode operations only on 64 bytes aligned buffers, we will register only the aligned part of the buffers.
  * This function is optional - but it is recommended to use for better performance.
  *
  * @param eco_encoder                    Pointer to an initialized EC encoder.
