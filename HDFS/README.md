@@ -65,7 +65,7 @@ _Encode_
     
 The test will allocate  _numData_ buffers used for the data, _numCode_ used for the encoded data (chunkSizeB bytes each) and encoder specified by the user.   
 Then, it will read  _numData_ * _chunkSizeB_ bytes from  _inputFile_ and calculate the encoded data.   
-The encoded data will be writen into <inputFile>.<coderIndex>.encode.code.
+The encoded data will be writen into _inputFile_._coderIndex_.encode.code.
     
 _Decode_ 
 
@@ -80,6 +80,6 @@ The test will allocate  _numData_ buffers used for the data, _numCode_ used for 
 Then, it will read  _numData_ * _chunkSizeB_ bytes from  _inputFile_ and  _numCode_ * _chunkSizeB_ bytes from  _encodedFile_.
 Then, it will erase the blocks corresponding to _erasures_ and compute them without using the _redundant_ blocks.
 
-The decoded data will be written into <inputFile>.<coderIndex>.decode.data (Should be equal to the _inputFile_).  
-The decoded code data will be written into <inputFile>.<coderIndex>.decode.code (Should be equal to the _encodedFile_).
+The decoded data will be written into _inputFile_._coderIndex_.decode.data (Should be equal to the _inputFile_).  
+The decoded code data will be written into _inputFile_._coderIndex_.decode.code (Should be equal to the _encodedFile_).
 

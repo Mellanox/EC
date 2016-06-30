@@ -238,9 +238,6 @@ public class RawErasureCoderValidationTest {
 			if (chunkSizeB <= 0) {
 				usage("Invalid number of chunkSizeB.");
 			}
-			if (chunkSizeB % 64 != 0) {
-				usage("Invalid inputs : chunksize must be aligned to 64b");
-			}
 		} catch (NumberFormatException e) {
 			usage("Malformed size of chunk, " + e.getMessage());
 		}

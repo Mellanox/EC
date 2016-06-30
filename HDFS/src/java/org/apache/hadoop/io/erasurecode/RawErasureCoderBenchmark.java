@@ -230,18 +230,18 @@ public final class RawErasureCoderBenchmark {
     if (encode) {
       RawErasureEncoder encoder = CODER_MAKERS.get(index).createEncoder(
           BenchData.NUM_DATA_UNITS, BenchData.NUM_PARITY_UNITS);
-      encoder.encode(new byte[BenchData.NUM_DATA_UNITS][64],
-          new byte[BenchData.NUM_PARITY_UNITS][64]);
+      encoder.encode(new byte[BenchData.NUM_DATA_UNITS][1],
+          new byte[BenchData.NUM_PARITY_UNITS][1]);
       return encoder;
     } else {
       RawErasureDecoder decoder = CODER_MAKERS.get(index).createDecoder(
           BenchData.NUM_DATA_UNITS, BenchData.NUM_PARITY_UNITS);
-      byte[][] inputs = new byte[BenchData.NUM_ALL_UNITS][64];
+      byte[][] inputs = new byte[BenchData.NUM_ALL_UNITS][1];
       for (int erasedIndex : BenchData.ERASED_INDEXES) {
         inputs[erasedIndex] = null;
       }
       decoder.decode(inputs, BenchData.ERASED_INDEXES,
-          new byte[BenchData.ERASED_INDEXES.length][64]);
+          new byte[BenchData.ERASED_INDEXES.length][1]);
       return decoder;
     }
   }
