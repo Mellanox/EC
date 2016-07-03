@@ -17,16 +17,26 @@ Erasure Coding operations are very CPU intensive actions and can be a major over
 
 ### Installation and Usage
 1. cd HDFS
-2. ant build -DHADOOP_HOME=/path/to/hadoop/home/dir
-3. Place your MellanoxECOffload JAR file on every node in the cluster (located in build/jar/MellanoxECOffload.jar) :  
-The preferable location is where all the Hadoop Common JARs are already found:
+2. * Install  
 
-        $HADOOP_HOME/share/hadoop/common/lib
-4. Place your libHdfsEcOffload.so file on every node in the cluster (located in build/lib/libHdfsEcOffload.so) :  
-The preferable location is where the Hadoop native libraries are already found:
+			ant install -DJAVA_HOME=/path/to/java/home/dir -DHADOOP_HOME=/path/to/hadoop/home/dir
 
-        $HADOOP_HOME/lib/native/
-5. Configure HDFS Erasure Coding Offload plugin in hdfs-site.xml as follows :
+        This will build and copy MellanoxECOffload.jar and libHdfsEcOffload.so to the preferable locations in your Hadoop home directory.
+
+    * Build
+
+			ant build -DJAVA_HOME=/path/to/java/home/dir -DHADOOP_HOME=/path/to/hadoop/home/dir
+
+        1. Place your MellanoxECOffload JAR file (located in build/jar/MellanoxECOffload.jar) :  
+			The preferable location is where all the Hadoop Common JARs are already found:
+
+                $HADOOP_HOME/share/hadoop/common/lib
+        2. Place your libHdfsEcOffload.so file (located in build/lib/libHdfsEcOffload.so) :  
+            The preferable location is where the Hadoop native libraries are already found:
+
+                $HADOOP_HOME/lib/native/
+
+3. Configure HDFS Erasure Coding Offload plugin in hdfs-site.xml as follows :
 
         <property>
             <name>io.erasurecode.codec.rs.rawcoder</name>

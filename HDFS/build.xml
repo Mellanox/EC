@@ -5,12 +5,9 @@
         <delete dir="build"/>
     </target>
 
-    <path id="classpath">
-        <fileset dir="./hadoop-jars" includes="**/*.jar"/>
-    </path>
-
     <target name="build">
-
+        <property name="JAVA_HOME" value="world"/>
+        <echo message="Setting Java home dir to : ${JAVA_HOME}"/>
         <property name="HADOOP_HOME" value="world"/>
         <echo message="Setting Hadoop home dir to : ${HADOOP_HOME}"/>
 
@@ -25,16 +22,12 @@
               <class name="com.mellanox.erasurecode.rawcoder.MellanoxRSRawEncoder"/>
               <class name="com.mellanox.erasurecode.rawcoder.MellanoxRSRawDecoder"/>
         </javah>
-	<exec executable="/bin/sh">
-		<arg value="-c" />
-                <arg value="cp src/native/com/mellanox/erasurecode/*.c src/native/com/mellanox/erasurecode/*.h build/c"/>
-        </exec>
 	<echo message="creating libHdfsEcOffload.so"/>
         <mkdir dir="build/lib"/>
 	<exec executable="/bin/sh" failonerror="true">
                 <arg value="-c" />
                 <arg value="gcc -g -ggdb -Wall -W -D_GNU_SOURCE -shared -fpic -I /usr/include/jerasure -o build/lib/libHdfsEcOffload.so -libverbs -lgf_complete -lJerasure -lrdmacm -lecOffload
-				-I $JAVA_HOME/include -I $JAVA_HOME/include/linux build/c/Mellanox*.c"/>
+				-I ${JAVA_HOME}/include -I ${JAVA_HOME}/include/linux -I build/c src/native/com/mellanox/erasurecode/*.c"/>
         </exec>
         <exec executable="/bin/sh">
                 <arg value="-c" />
@@ -59,5 +52,13 @@
         </jar>
     </target>
 
+    <target name="install">
+        <antcall target="build"/>
+
+	<echo message="Copying MellanoxECOffload.jar and libHdfsEcOffload.so"/>
+	<copy file="./build/lib/libHdfsEcOffload.so" todir="${HADOOP_HOME}/lib/native/"/>
+	<copy file="./build/jar/MellanoxECOffload.jar" todir="${HADOOP_HOME}/share/hadoop/common/lib/"/>
+
+    </target>
 </project>
 
