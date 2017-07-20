@@ -1,3 +1,5 @@
+# DEPRECATED (TBD: replacement library)
+
 # Erasure Coding NIC Offload library
 Erasure coding (EC) is a method of data protection in which data is broken into fragments,  
 expanded and encoded with redundant data pieces and stored across a set of different locations or storage media.  
