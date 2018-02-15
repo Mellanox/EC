@@ -1,6 +1,8 @@
 # DEPRECATED (TBD: replacement library)
+## NOTE: For the C level EC offloads, use MLNX_OFED libraries and documentation
+More EC related information can be found here: https://community.mellanox.com/docs/DOC-2414
 
-# Erasure Coding NIC Offload library
+# Java Erasure Coding NIC Offload library
 Erasure coding (EC) is a method of data protection in which data is broken into fragments,  
 expanded and encoded with redundant data pieces and stored across a set of different locations or storage media.  
 Data encoding/decoding is very CPU intensive and can be a major overhead when using Erasure coding.  
